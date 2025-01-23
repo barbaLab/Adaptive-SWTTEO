@@ -1,7 +1,7 @@
 function pars = SD_AdSWTTEO()
-%% function defining defualt parameters for SWTTEO spike detection algorithm
+%% function defining defualt parameters for AdSWTTEO spike detection algorithm
 pars.wavLevel   = 2;                % Wavelet decomposition level
-pars.waveName    = 'sym6';           % wavelet type
+pars.waveName    = 'sym5';           % wavelet type
 
 pars.winType    = @hamming;        % function handle for the smoothing window type; This is fed to window function
 pars.smoothN    = 1;              % [ms] for the smoothing operator. Set to 0 to turn off smoothing
