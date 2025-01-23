@@ -23,5 +23,3 @@ pars.fs = [yourSamplingRate];
 ```
 Set parameters that best fit with your data, especially the `pars.MultCoeff`, which is the coefficient multiplying the second global threshold. The other outputs are (in order): the peak-to-peak amplitude, the peak value of the spike, the spike duration and the energy value at spike's positions.
 
-### Credits
-Peter O'Connor (2025). PeakSeek (https://www.mathworks.com/matlabcentral/fileexchange/26581-peakseek), MATLAB Central File Exchange. 
