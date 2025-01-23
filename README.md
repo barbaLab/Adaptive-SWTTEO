@@ -15,7 +15,7 @@ The code is inspired from the SWTTEO algorithm presented in _Florian Lieb, Hans-
 <img src="./AdSWTTEO_schema1.png" alt="AdSWTTEO_schema1" width="900" />
 
 ### Usage
-To detect spikes you can just call `[ts, ~, ~, ~, ~] = AdSWTTEO(data)` to use the default parameters written in `pars_AdSWTTEO`. You can modify this function to use different parameters. The best procedure to adopt is:
+To detect spikes you can just call `[ts, ~, ~, ~, ~] = AdSWTTEO(data)` to use the default parameters written in `pars_AdSWTTEO`, inserting your sampling rate as `pars.fs`. You can modify this function to use different parameters. The best procedure to adopt is:
 ```matlab
 pars = pars_AdSWTTEO;
 pars.fs = [yourSamplingRate];
