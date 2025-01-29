@@ -1,0 +1,32 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Adaptive-SWTTEO
+message: >-
+  Local spike detection algorithm for extracellular neural
+  signals. 
+type: software
+authors:
+  - given-names: Tommaso
+    family-names: Lambresa
+    orcid: 'https://orcid.org/0009-0004-9201-6217'
+  - given-names: Federico
+    family-names: Barban
+    email: federico.barban@unige.it
+    orcid: 'https://orcid.org/0000-0002-5828-0282'
+  - given-names: Michela
+    family-names: Chiappalone
+    orcid: 'https://orcid.org/0000-0003-1427-5147'
+repository-code: 'https://github.com/barbaLab/Adaptive-SWTTEO'
+abstract: >-
+  Here we present a novel Matlab-based spike detection
+  algorithm, Adaptive-SWTTEO, inspired by an existing method
+  that has demonstrated superior performance compared to
+  other approaches. The new algorithm’s performance was
+  evaluated against the original method using a custom
+  synthetic dataset that included both non-bursting and
+  bursting neural activity. Results showed that the
+  Adaptive-SWTTEO outperformed the original algorithm in
+  terms of detection efficiency, reliability and speed.
+license: LGPL-3.0+
