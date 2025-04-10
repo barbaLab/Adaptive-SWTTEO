@@ -37,8 +37,12 @@ function [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data,pars)
 %
 %   Author: Tommaso Lambresa 19/06/2024
 
+% Check input shape
+if ~isrow(data) && ~iscolumn(data)
+    error("Input data must be a row/column vector");
+end
 
-%parse inputs
+% Parse inputs
 if nargin < 2
     pars = pars_AdSWTTEO;
     pars.fs = 25000; % to adapt to your sampling frequency
@@ -53,13 +57,13 @@ fs = pars.fs;
 pars.smoothN = round(pars.smoothN*1e-3*fs);
 
 % Defining TEO operator
-TEO = @(x,k) (x.^2 - myTEOcircshift(x,[-k, 0]).*myTEOcircshift(x,[k, 0]));
+TEO = @(x,k) (x.^2 - TEOshift(x,[-k, 0]).*TEOshift(x,[k, 0]));
 
 L = length(data);
-data = data(:);     % ensure in is column
+data = data(:);     % ensure input is column
 
 
-%do zero padding if the L is not divisible by a power of two
+% Zero padding if the L is not divisible by a power of two
 % TODO use nextpow2 here
 pow = 2^pars.wavLevel;
 if rem(L,pow) > 0
@@ -71,32 +75,29 @@ end
 
 
 %vectorized version:
-[lo_D,HiD] = wfilters(pars.waveName);
+[lo_D,~] = wfilters(pars.waveName);
 out_ = zeros(size(data));
 ss = data;
 for k=1:pars.wavLevel
     %Extension
     lf = length(lo_D);
     ss = extendswt(ss,lf);
+
     %convolution
     swa = conv(ss,lo_D','valid');
     swa = swa(2:end,:); %even number of filter coeffcients
+
     %apply teo to swt output
-
-
     temp = abs(TEO(swa,pars.k));
 
-
-
+    %smoothing
     if pars.smoothN
         wind = window(pars.winType,pars.smoothN,pars.winPars{:});
         temp2 = conv(temp,wind','same');
     else
         temp2 = temp;
     end
-
     out_ = out_ + temp2;
-
 
     %dyadic upscaling of filter coefficients
     lo_D = dyadup(lo_D,0,1);
@@ -107,14 +108,14 @@ clear('ss');
 
 % Standard detection
 
-lambda_swtteo   = mymovquant(out_,.99,pars.medWdw*fs);
+lambda_swtteo   = moving_quantile(out_,.99,pars.medWdw*fs);
 lambda_data      =  pars.MultCoeff*median(abs(data));
 data_th = zeros(size(data));
 data_th(out_>lambda_swtteo) = pars.Polarity .* data(out_>lambda_swtteo);
 
 minTime = 1e-3*pars.RefrTime; % parameter in milliseconds
-% [ts,pmin] = mypeakseek(data_th,minTime*pars.fs,lambda_data);
-[ts_tmp,~] = mypeakseek(abs(data_th),minTime*pars.fs);
+% [ts,pmin] = faster_findpeaks(data_th,minTime*pars.fs,lambda_data);
+[ts_tmp,~] = faster_findpeaks(abs(data_th),minTime*pars.fs);
 % pmin = pmin .* pars.Polarity;
 
 
@@ -216,7 +217,7 @@ if h > 1
     tloc = repmat(ts,2*PLP+1,1) + (-PLP:PLP).';
     tloc(tloc < 1) = 1;
     tloc(tloc > numel(data)) = numel(data);
-    [pmax,Imax] = max(data(tloc));
+    [pmax,~] = max(data(tloc));
     p2pamp = pmax + pmin;
 
     %% Get peak width and exlude pw > pars.PeakDur
@@ -228,13 +229,13 @@ if h > 1
     tlocmax(tlocmax < 1) = 1;
     tlocmax(tlocmax > numel(data)) = numel(data);
     for ii=1:size(tlocmin,2)
-        [thispeak, ~] = mypeakseek(data(tlocmin(:,ii)),[],[],1);
+        [thispeak, ~] = faster_findpeaks(data(tlocmin(:,ii)),[],[],1);
         if isempty(thispeak)
             thispeak = PLP+1;
         end
         Imax1(ii) = 1-thispeak;
 
-        [thispeak,~] = mypeakseek(data(tlocmax(:,ii)),[],[],1);
+        [thispeak,~] = faster_findpeaks(data(tlocmax(:,ii)),[],[],1);
         if isempty(thispeak)
             thispeak = PLP;
         end
@@ -274,7 +275,7 @@ y(1:lf/2,:) = x(end-lf/2+1:end,:);
 y(lf/2+1:lf/2+r,:) = x;
 y(end-lf/2+1:end,:) = x(1:lf/2,:);
 
-function X = myTEOcircshift(Y,k)
+function X = TEOshift(Y,k)
 %circshift without the boundary behaviour...
 
 colshift = k(1);
@@ -299,8 +300,8 @@ end
 
 X = temp;
 
-function quant_X = mymovquant(X, p, n)
-%% MYMOVQUANT - calculate moving quantile
+function quant_X = moving_quantile(X, p, n)
+%% moving_quantile - calculate moving quantile
 %   Input parameters:
 %      X - 1-dimensional array
 %      p - Quantile to calculate. Must be between 0 and 1 (both included).
@@ -310,7 +311,7 @@ function quant_X = mymovquant(X, p, n)
 
 quant_X = zeros(size(X));
 
-% padding if signal length is not divisible for n
+% Padding if signal length is not divisible for n
 remainder = mod(length(X), n);
 num_windows = floor(length(X) / n)+1;
 X_ax_pad = [X; zeros(n - remainder,1)];
@@ -321,7 +322,7 @@ X_matrix = reshape(X_ax_pad', n, num_windows);
 % Compute the quantile for each column
 quant = quantile(X_matrix, p, 1);
 
-% check if the p-th quantile is the maximum value, if so replace with the last
+% Check if the p-th quantile is the maximum value, if so replace with the last
 % but one
 max_Xwin = max(X_matrix,[],1);
 critical_values = find(max_Xwin == quant);
@@ -339,7 +340,7 @@ quant_vector = quant_vector(:);  % Convert to a row vector
 quant_X = quant_vector(1:length(X));
 
 
-function [locs, pks]=mypeakseek(x,minpeakdist,minpeakh,npeaks)
+function [locs, pks]=faster_findpeaks(x,minpeakdist,minpeakh,npeaks)
 % Alternative to the findpeaks function.  This thing runs much much faster.
 %
 % x is a vector input (generally a timecourse)
