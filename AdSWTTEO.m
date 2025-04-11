@@ -1,18 +1,32 @@
-function [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data,pars)
+function [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data, fs, varargin)
 %
 % New adaptive threshold SWTTEO, same procedure as normal SWTTEO but the
 % threshold on the energy is computed locally.
 %
 %   Usage:
-%       [ts,~,~,~,~] = AdSWTTEO(data);  to obtain only spikes using default
-%                                       parameters
-%       pars = pars_AdSWTTEO;
-%       [ts,~,~,~,~] = AdSWTTEO(data, pars); to set custom parameters.
+%       [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data, fs);  % using default parameters
+%       
+%       % Using name-value pairs for custom parameters
+%       [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data, fs, 'MultCoeff', 8, 'RefrTime', 1);
 %
 %   Input parameters:
-%       data:   Input single-channel signal 1xN
-%       pars:   Configurable parameters for the detection
-%                   (look at pars_AdSWTTEO for description)
+%       data:   Input single-channel signal (1xN or Nx1 vector)
+%       fs:     Sampling frequency in Hz
+%       
+%       Optional parameters (name-value pairs or structure):
+%           wavLevel:   Wavelet decomposition level (default: 2)
+%           waveName:   Wavelet type (default: 'sym5')
+%           winType:    Function handle for smoothing window (default: @hamming)
+%           smoothN:    Size of the smoothing operator in ms (default: 1, set to 0 to turn off)
+%           winPars:    Optional parameters for the smoothing window (default: {'symmetric'})
+%           RefrTime:   Refractory time in ms (default: 0.5)
+%           MultCoeff:  Multiplication coefficient for SWTTEO thresholding (default: 6)
+%           Polarity:   Spike polarity: -1 for negative, 1 for positive (default: -1)
+%           PeakDur:    Max peak duration (pulse lifetime) in ms (default: 2.3)
+%           medWdw:     Window length for moving quantile in seconds (default: 0.003)
+%           k:          Number of samples for TEO (default: 3)
+%           overshoot:  Secondary window length for boundary control in seconds (default: 0.0007)
+%
 %   Output parameters:
 %       ts:     Timestamps of the detected spikes stored in 1xNspks vector.
 %       p2pamp: peak-to-peak amplitude
@@ -37,23 +51,47 @@ function [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data,pars)
 %
 %   Author: Tommaso Lambresa 19/06/2024
 
-% Check input shape
-if ~isrow(data) && ~iscolumn(data)
-    error("Input data must be a row/column vector");
-end
+% Default parameters
+defaults.wavLevel   = 2;              % Wavelet decomposition level
+defaults.waveName   = 'sym5';         % Wavelet type
+defaults.winType    = @hamming;       % Function handle for smoothing window
+defaults.smoothN    = 1;              % [ms] Size of the smoothing operator. Set to 0 to turn off
+defaults.winPars    = {'symmetric'};  % Optional parameters for the smoothing window
+defaults.RefrTime   = 0.5;            % [ms] Refractory time
+defaults.MultCoeff  = 6;              % Multiplication coefficient for SWTTEO thresholding
+defaults.Polarity   = -1;             % {-1; 1} Spike polarity: -1 for negative, 1 for positive
+defaults.PeakDur    = 2.3;            % [ms] Max peak duration (pulse lifetime)
+defaults.medWdw     = 0.003;          % [s] Window length for moving quantile
+defaults.k          = 3;              % Number of samples for TEO
+defaults.overshoot  = 0.0007;         % [s] Secondary window length for boundary control
+
+% Create input parser
+p = inputParser;
+
+addRequired(p, 'data', @(x) isrow(x) || iscolumn(x));
+addRequired(p, 'fs', @(x) isnumeric(x) && isscalar(x) && x > 0);
+
+% Add parameters
+addParameter(p, 'wavLevel', defaults.wavLevel, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'waveName', defaults.waveName, @ischar);
+addParameter(p, 'winType', defaults.winType, @(x) isa(x, 'function_handle'));
+addParameter(p, 'smoothN', defaults.smoothN, @(x) isnumeric(x) && isscalar(x) && x >= 0);
+addParameter(p, 'winPars', defaults.winPars, @iscell);
+addParameter(p, 'RefrTime', defaults.RefrTime, @(x) isnumeric(x) && isscalar(x) && x >= 0);
+addParameter(p, 'MultCoeff', defaults.MultCoeff, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'Polarity', defaults.Polarity, @(x) isnumeric(x) && isscalar(x) && (x == -1 || x == 1));
+addParameter(p, 'PeakDur', defaults.PeakDur, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'medWdw', defaults.medWdw, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'k', defaults.k, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'overshoot', defaults.overshoot, @(x) isnumeric(x) && isscalar(x) && x > 0);
 
 % Parse inputs
-if nargin < 2
-    pars = pars_AdSWTTEO;
-    pars.fs = 25000; % to adapt to your sampling frequency
-    warning("Sampling frequency is not specified, using default 25 kHz")
-end
+parse(p, data, fs, varargin{:});
 
-if numel(fieldnames(pars)) ~= 13
-    error("pars structure lacks of some field.")
-end
+data = p.Results.data;
+fs = p.Results.fs;
+pars = rmfield(p.Results, {'data', 'fs'});
 
-fs = pars.fs;
 pars.smoothN = round(pars.smoothN*1e-3*fs);
 
 % Defining TEO operator
@@ -61,7 +99,6 @@ TEO = @(x,k) (x.^2 - TEOshift(x,[-k, 0]).*TEOshift(x,[k, 0]));
 
 L = length(data);
 data = data(:);     % ensure input is column
-
 
 % Zero padding if the L is not divisible by a power of two
 % TODO use nextpow2 here
@@ -72,8 +109,6 @@ if rem(L,pow) > 0
     data = [data; zeros(Ldiff,1)];
 end
 
-
-
 %vectorized version:
 [lo_D,~] = wfilters(pars.waveName);
 out_ = zeros(size(data));
@@ -82,14 +117,11 @@ for k=1:pars.wavLevel
     %Extension
     lf = length(lo_D);
     ss = extendswt(ss,lf);
-
     %convolution
     swa = conv(ss,lo_D','valid');
     swa = swa(2:end,:); %even number of filter coeffcients
-
     %apply teo to swt output
     temp = abs(TEO(swa,pars.k));
-
     %smoothing
     if pars.smoothN
         wind = window(pars.winType,pars.smoothN,pars.winPars{:});
@@ -98,7 +130,6 @@ for k=1:pars.wavLevel
         temp2 = temp;
     end
     out_ = out_ + temp2;
-
     %dyadic upscaling of filter coefficients
     lo_D = dyadup(lo_D,0,1);
     %updates
@@ -107,42 +138,32 @@ end
 clear('ss');
 
 % Standard detection
-
 lambda_swtteo   = moving_quantile(out_,.99,pars.medWdw*fs);
 lambda_data      =  pars.MultCoeff*median(abs(data));
 data_th = zeros(size(data));
 data_th(out_>lambda_swtteo) = pars.Polarity .* data(out_>lambda_swtteo);
-
 minTime = 1e-3*pars.RefrTime; % parameter in milliseconds
-% [ts,pmin] = faster_findpeaks(data_th,minTime*pars.fs,lambda_data);
-[ts_tmp,~] = faster_findpeaks(abs(data_th),minTime*pars.fs);
-% pmin = pmin .* pars.Polarity;
-
+[ts_tmp,~] = faster_findpeaks(abs(data_th),minTime*fs);
 
 %% GET MAX VALUE AROUND THE DETECTION
 h = 1;
 for i = 1:length(ts_tmp)
-
-    window_size = round(0.001 * pars.fs);
+    window_size = round(0.001 * fs);
     interval = max(1, ts_tmp(i) - window_size):min(length(data), ts_tmp(i) + window_size);
-
     signal_window = data(interval);
-
     [pmin_tmp, locs] = max(pars.Polarity * signal_window);
     pmin_tmp = pars.Polarity * pmin_tmp;
-
     % Check the boundaries of the main window
     if locs == 1 || locs == length(signal_window)
         % Define secondary, smaller interval
         overshoot = pars.overshoot;
-        secondary_size = round(overshoot * pars.fs); % Half the size of the main window
+        secondary_size = round(overshoot * fs); % Half the size of the main window
         if locs == 1
             secondary_interval = max(1, interval(1) - secondary_size):interval(1);
             % Search for the maximum in the secondary interval
             secondary_window = data(secondary_interval);
             [pmin_tmp_secondary, locs_secondary] = max(pars.Polarity * secondary_window);
             pmin_tmp_secondary = pars.Polarity * pmin_tmp_secondary;
-
             % Update peak info if the secondary search improves the result
             if pars.Polarity < 0
                 if pmin_tmp_secondary < pmin_tmp
@@ -161,7 +182,6 @@ for i = 1:length(ts_tmp)
             secondary_window = data(secondary_interval);
             [pmin_tmp_secondary, locs_secondary] = max(pars.Polarity * secondary_window);
             pmin_tmp_secondary = pars.Polarity * pmin_tmp_secondary;
-
             % Update peak info if the secondary search improves the result
             if pars.Polarity < 0
                 if pmin_tmp_secondary < pmin_tmp
@@ -175,10 +195,7 @@ for i = 1:length(ts_tmp)
                 end
             end
         end
-
-
     end
-
     if pars.Polarity < 0
         if pmin_tmp < pars.Polarity * lambda_data
             ts(h) = interval(1) + locs - 1;
@@ -196,10 +213,9 @@ end
 if h > 1
     [ts, ia] = unique(ts, 'stable');
     pmin = pmin(ia);
-
     %% DOUBLE CHECK FOR REFRACTORY PERIOD
     period = diff(ts);
-    candidates = find(period<minTime*pars.fs);
+    candidates = find(period<minTime*fs);
     if ~isempty(candidates)
         if abs(pmin(candidates))>abs(pmin(candidates+1))
             ts(candidates+1)=[];
@@ -209,19 +225,15 @@ if h > 1
             pmin(candidates) = [];
         end
     end
-
     E = out_(ts);
-
     %% GET PEAK-TO-PEAK VALUES
-    PLP = round(pars.PeakDur*1e-3*pars.fs); % from ms to samples
+    PLP = round(pars.PeakDur*1e-3*fs); % from ms to samples
     tloc = repmat(ts,2*PLP+1,1) + (-PLP:PLP).';
     tloc(tloc < 1) = 1;
     tloc(tloc > numel(data)) = numel(data);
     [pmax,~] = max(data(tloc));
     p2pamp = pmax + pmin;
-
     %% Get peak width and exlude pw > pars.PeakDur
-
     tlocmin = flipud( repmat(ts,PLP+1,1) + (-PLP:0).');
     tlocmin(tlocmin < 1) = 1;
     tlocmin(tlocmin > numel(data)) = numel(data);
@@ -234,20 +246,16 @@ if h > 1
             thispeak = PLP+1;
         end
         Imax1(ii) = 1-thispeak;
-
         [thispeak,~] = faster_findpeaks(data(tlocmax(:,ii)),[],[],1);
         if isempty(thispeak)
             thispeak = PLP;
         end
         Imax2(ii) = thispeak;
     end
-
     pW = Imax2 - Imax1;
-
     %% EXCLUDE VALUES
     pw_ex = pW>PLP;
     pm_ex = pmax<=0;
-
     ex = pw_ex | pm_ex;
     ts(ex) = [];
     p2pamp(ex) = [];
@@ -277,27 +285,21 @@ y(end-lf/2+1:end,:) = x(1:lf/2,:);
 
 function X = TEOshift(Y,k)
 %circshift without the boundary behaviour...
-
 colshift = k(1);
 rowshift = k(2);
-
 temp  = circshift(Y,k);
-
 if colshift < 0
     temp(end+colshift+1:end,:) = flipud(Y(end+colshift+1:end,:));
 elseif colshift > 0
     temp(1:1+colshift-1,:) = flipud(Y(1:1+colshift-1,:));
 else
-
 end
-
 if rowshift<0
     temp(:,end+rowshift+1:end) = fliplr(Y(:,end+rowshift+1:end));
 elseif rowshift>0
     temp(:,1:1+rowshift-1) = fliplr(Y(:,1:1+rowshift-1));
 else
 end
-
 X = temp;
 
 function quant_X = moving_quantile(X, p, n)
@@ -331,12 +333,9 @@ if ~isempty(critical_values)
     data2sort = X_matrix(:,critical_values);
     sorted_win = sort(data2sort);
     quant(critical_values)=sorted_win(end-1,:);
-end
-
-
+en
 quant_vector = repmat(quant, n, 1);  % Repeat each quantile value for each sample in the window
 quant_vector = quant_vector(:);  % Convert to a row vector
-
 quant_X = quant_vector(1:length(X));
 
 
@@ -365,47 +364,30 @@ switch nargin
     otherwise
         error("not ienough input arguments");
 end
-
 if isempty(minpeakdist)
     minpeakdist = 1;
 end
 if isempty(minpeakh)
     minpeakh = -inf;
 end
-
-
 if size(x,2)==1, x=x'; end
-
 % Find all maxima and ties
 locs=find(x(2:end-1)>=x(1:end-2) & x(2:end-1)>=x(3:end))+1;
-
-
 locs(x(locs)<=minpeakh)=[];
-
 if minpeakdist>1
     while 1
-
         del=diff(locs)<minpeakdist;
-
         if ~any(del), break; end
-
         pks=x(locs);
-
-        [garb, mins]=min([pks(del) ; pks([false del])]);
-
+        [~, mins]=min([pks(del) ; pks([false del])]);
         deln=find(del);
-
         deln=[deln(mins==1) deln(mins==2)+1];
-
         locs(deln)=[];
-
     end
 end
-
 if ~isempty(npeaks) && ~isempty(locs)
     locs = locs(1:npeaks);
 end
-
 if nargout>1
     pks=x(locs);
 end
