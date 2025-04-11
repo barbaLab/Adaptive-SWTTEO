@@ -16,30 +16,29 @@ The code is inspired from the SWTTEO algorithm presented in _Florian Lieb, Hans-
 
 ### Usage
 #### Input parameters:
-data: Input single-channel signal (1xN or Nx1 vector)
-fs: Sampling frequency in Hz
+`data`: Input single-channel signal (1xN or Nx1 vector)  
+`fs`: Sampling frequency in Hz
 
 #### Optional parameters (name-value pairs):
-wavLevel: Wavelet decomposition level (default: 2)
-waveName: Wavelet type (default: 'sym5')
-winType: Function handle for smoothing window (default: @hamming)
-smoothN: Size of the smoothing operator in ms (default: 1, set to 0 to turn off)
-winPars: Optional parameters for the smoothing window (default: {'symmetric'})
-RefrTime: Refractory time in ms (default: 0.5)
-MultCoeff: Multiplication coefficient for SWTTEO thresholding (default: 6)
-Polarity: Spike polarity: -1 for negative, 1 for positive (default: -1)
-PeakDur: Max peak duration (pulse lifetime) in ms (default: 2.3)
-medWdw: Window length for moving quantile in seconds (default: 0.003)
-k: Number of samples for TEO (default: 3)
-overshoot: Secondary window length for boundary control in seconds (default: 0.0007)
+`wavLevel`: Wavelet decomposition level (default: 2)  
+`waveName`: Wavelet type (default: 'sym5')  
+`winType`: Function handle for smoothing window (default: @hamming)  
+`smoothN`: Size of the smoothing operator in ms (default: 1, set to 0 to turn off)  
+`winPars`: Optional parameters for the smoothing window (default: {'symmetric'})  
+`RefrTime`: Refractory time in ms (default: 0.5)  
+`MultCoeff`: Multiplication coefficient for SWTTEO thresholding (default: 6)  
+`Polarity`: Spike polarity: -1 for negative, 1 for positive (default: -1)  
+`PeakDur`: Max peak duration (pulse lifetime) in ms (default: 2.3)  
+`medWdw`: Window length for moving quantile in seconds (default: 0.003)  
+`k`: Number of samples for TEO (default: 3)  
+`overshoot`: Secondary window length for boundary control in seconds (default: 0.0007)
 
 #### Output parameters:
-ts: Timestamps of the detected spikes stored in 1xNspks vector.
-p2pamp: peak-to-peak amplitude
-pmin: amplitude in volt at spike's positions
-p2pamp: peak-to-peak amplitude
-p2pamp: peak-to-peak amplitudeease. Decreasing this factor makes it more
-%       sensitive to detect spikes.
+`ts`: Timestamps of the detected spikes stored in 1xNspks vector  
+`p2pamp`: Peak-to-peak amplitude  
+`pmin`: Amplitude in volt at spike's positions  
+`pW`: Pulse width of detected spikes  
+`E`: Energy values from the SWTTEO algorithm
 
 ### Exaples
 ```matlab

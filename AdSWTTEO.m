@@ -28,11 +28,11 @@ function [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data, fs, varargin)
 %           overshoot:  Secondary window length for boundary control in seconds (default: 0.0007)
 %
 %   Output parameters:
-%       ts:     Timestamps of the detected spikes stored in 1xNspks vector.
-%       p2pamp: peak-to-peak amplitude
-%       pmin:   amplitude in volt at spike's positions
-%       p2pamp: peak-to-peak amplitude
-%       p2pamp: peak-to-peak amplitude
+%       p2pamp: Peak-to-peak amplitude  
+%       pmin: Amplitude in volt at spike's positions  
+%       ts: Timestamps of the detected spikes stored in 1xNspks vector  
+%       pW: Pulse width of detected spikes  
+%       E: Energy values from the SWTTEO algorithm
 %
 %   Description:
 %       AdSWTTEO(data,pars) computes the location of action potential in noisy
@@ -333,7 +333,7 @@ if ~isempty(critical_values)
     data2sort = X_matrix(:,critical_values);
     sorted_win = sort(data2sort);
     quant(critical_values)=sorted_win(end-1,:);
-en
+end
 quant_vector = repmat(quant, n, 1);  % Repeat each quantile value for each sample in the window
 quant_vector = quant_vector(:);  % Convert to a row vector
 quant_X = quant_vector(1:length(X));
