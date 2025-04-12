@@ -46,5 +46,5 @@ The code is inspired from the SWTTEO algorithm presented in _Florian Lieb, Hans-
 % Using name-value pairs for custom parameters
 [ts,p2pamp,pmin,pW,E] = AdSWTTEO(data, fs, 'MultCoeff', 8, 'RefrTime', 1);
 ```
-Set parameters that best fit with your data, especially the `pars.MultCoeff`, which is the coefficient multiplying the second global threshold. The other outputs are (in order): the peak-to-peak amplitude, the peak value of the spike, the spike duration and the energy value at spike's positions.
+Set parameters that best fit with your data, especially the `MultCoeff`, which is the coefficient multiplying the second global threshold. The other outputs are (in order): the peak-to-peak amplitude, the peak value of the spike, the spike duration and the energy value at spike's positions.
 
