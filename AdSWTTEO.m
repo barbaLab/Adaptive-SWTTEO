@@ -138,12 +138,12 @@ end
 clear('ss');
 
 % Standard detection
-lambda_swtteo   = moving_quantile(out_,.99,pars.medWdw*fs);
+lambda_swtteo   = moving_quantile(out_,.99,round(pars.medWdw*fs));
 lambda_data      =  pars.MultCoeff*median(abs(data));
 data_th = zeros(size(data));
 data_th(out_>lambda_swtteo) = pars.Polarity .* data(out_>lambda_swtteo);
 minTime = 1e-3*pars.RefrTime; % parameter in milliseconds
-[ts_tmp,~] = faster_findpeaks(abs(data_th),minTime*fs);
+[ts_tmp,~] = faster_findpeaks(abs(data_th),round(minTime*fs));
 
 %% GET MAX VALUE AROUND THE DETECTION
 h = 1;
@@ -215,7 +215,7 @@ if h > 1
     pmin = pmin(ia);
     %% DOUBLE CHECK FOR REFRACTORY PERIOD
     period = diff(ts);
-    candidates = find(period<minTime*fs);
+    candidates = find(period<round(minTime*fs));
     if ~isempty(candidates)
         if abs(pmin(candidates))>abs(pmin(candidates+1))
             ts(candidates+1)=[];
